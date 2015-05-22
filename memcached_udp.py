@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import socket
 import struct
 import threading
@@ -31,10 +32,10 @@ class Client(object):
             target=self._get_results_handler)
         self._results_handler_thread.setDaemon(True)
         self._results_handler_thread.start()
-        self._server_results = {x: {} for x in self.servers}
-        self._server_locks = {x: (0, threading.Lock()) for x in self.servers}
+        self._results = {}
         self._response_timeout = response_timeout
         self._debug = debug
+        self._request_id_generator = itertools.count()
 
     def _get_results_handler(self):
         while True:
@@ -49,44 +50,47 @@ class Client(object):
                         data))
                     print('memcached_udp: id={0}, packet_number={1}, '
                           'total_packets={2}, misc={3}'.format(*udp_header))
-                server_results = self._server_results[server]
-                lock = self._server_locks[server][1]
-                with lock:
-                    request_id = udp_header[0]
-                    server_results[request_id] = data[8:]
+
+                request_id = udp_header[0]
+                if request_id in self._results:
+                    self._results[request_id] = data[8:]
+                elif self._debug:
+                    print('memcached_udp: request id not found in results - '
+                          'ignoring... [request_id={0}]'.format(request_id))
+
             except socket.timeout:
                 pass
 
-    def _get_udp_header(self, request_id):
+    @staticmethod
+    def _get_udp_header(request_id):
         return struct.pack('!hhhh', request_id, 0, 1, 0)
 
     def _pick_server(self, key):
         return self.servers[hash(key) % len(self.servers)]
 
     def _get_request_id(self, server):
-        lock = self._server_locks[server][1]
-        with lock:
-            request_id = self._server_locks[server][0]
-            next_request_id = request_id + 1 if request_id < 60000 else 0
-            server_results = self._server_results[server]
-            if request_id in server_results:
-                raise RuntimeError(
-                    'Request id already exists for server [server={0}, '
-                    'request_id={1}]'.format(server, request_id))
-            self._server_locks[server] = (next_request_id, lock)
-            return request_id
+        request_id = self._request_id_generator.next()
+        if request_id in self._results:
+            raise RuntimeError(
+                'Request id already exists for server [server={0}, '
+                'request_id={1}]'.format(server, request_id))
+        if request_id > 60000:
+            self._request_id_generator = itertools.count()
+        self._results[request_id] = None
+        return request_id
 
     def _wait_for_result(self, server, request_id):
-        server_results = self._server_results[server]
         deadline = time.time() + self._response_timeout
-        while request_id not in server_results:
-            if time.time() >= deadline:
-                raise self.MemcachedServerNotRespondingError(
-                    'Memcached server is not responding: {0}'.format(server))
-            time.sleep(0.1)
-        result = server_results[request_id]
-        del server_results[request_id]
-        return result
+        try:
+            while not self._results[request_id]:
+                if time.time() >= deadline:
+                    raise self.MemcachedServerNotRespondingError(
+                        'Memcached server is not responding: {0}'.format(
+                            server))
+                time.sleep(0.1)
+            return self._results[request_id]
+        finally:
+            del self._results[request_id]
 
     def set(self, key, value):
         server = self._pick_server(key)
