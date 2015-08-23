@@ -41,7 +41,7 @@ class Client(object):
         while True:
             try:
                 data, server = self.socket.recvfrom(4096)
-                udp_header = struct.unpack('!hhhh', data[:8])
+                udp_header = struct.unpack('!Hhhh', data[:8])
                 if self._debug:
                     print(
                         'memcached_udp: results_handler [server]: {0}'.format(
@@ -63,7 +63,7 @@ class Client(object):
 
     @staticmethod
     def _get_udp_header(request_id):
-        return struct.pack('!hhhh', request_id, 0, 1, 0)
+        return struct.pack('!Hhhh', request_id, 0, 1, 0)
 
     def _pick_server(self, key):
         return self.servers[hash(key) % len(self.servers)]
