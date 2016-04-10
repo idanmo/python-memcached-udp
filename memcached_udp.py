@@ -18,6 +18,8 @@ import struct
 import threading
 import time
 
+from six import advance_iterator
+
 
 class Client(object):
 
@@ -69,7 +71,7 @@ class Client(object):
         return self.servers[hash(key) % len(self.servers)]
 
     def _get_request_id(self, server):
-        request_id = self._request_id_generator.next()
+        request_id = advance_iterator(self._request_id_generator)
         if request_id in self._results:
             raise RuntimeError(
                 'Request id already exists for server [server={0}, '
@@ -95,27 +97,39 @@ class Client(object):
     def set(self, key, value):
         server = self._pick_server(key)
         request_id = self._get_request_id(server)
-        cmd = '{0}set {1} 0 0 {2}\r\n{3}\r\n'.format(
-            self._get_udp_header(request_id), key, len(value), value)
+        cmd = b''.join([
+            self._get_udp_header(request_id),
+            b'set ',
+            key.encode(),
+            b' 0 0 ',
+            str(len(value)).encode(),
+            b'\r\n',
+            value.encode(), b'\r\n',
+        ])
 
         self.socket.sendto(cmd, server)
 
         r = self._wait_for_result(server, request_id)
 
-        if r.split('\r\n')[0] != 'STORED':
+        if r.split(b'\r\n')[0] != b'STORED':
             raise RuntimeError(
                 'Error storing "{0}" in {1}'.format(key, server))
 
     def get(self, key):
         server = self._pick_server(key)
         request_id = self._get_request_id(server)
-        cmd = '{0}get {1}\r\n'.format(self._get_udp_header(request_id), key)
+        cmd = b''.join([
+            self._get_udp_header(request_id),
+            b'get ',
+            key.encode(),
+            b'\r\n',
+        ])
 
         self.socket.sendto(cmd, server)
 
         r = self._wait_for_result(server, request_id)
 
-        if r.startswith('VALUE'):
-            arr = r.split('\r\n')
-            return '\r\n'.join(arr[1:len(arr)-2])
+        if r.startswith(b'VALUE'):
+            arr = r.split(b'\r\n')
+            return b'\r\n'.join(arr[1:len(arr)-2]).decode()
         return None

@@ -6,7 +6,7 @@ A simple UDP Memcached client implementation written in Python.
 Implemented for my own needs, use at your own risk :-)
 
 ## Python Compatibility
-* 2.7
+* >= 2.7 (3 included)
 
 ## Supported Operations
 * set

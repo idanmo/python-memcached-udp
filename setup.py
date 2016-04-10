@@ -25,6 +25,9 @@ setup(
     author='Idan Moyal',
     author_email='idanmo@gmail.com',
     py_modules=["memcached_udp"],
+    install_requires=[
+        "six==1.10.0",
+    ],
     classifiers=[
         'Development Status :: 1 - Alpha',
         'Intended Audience :: Developers',
