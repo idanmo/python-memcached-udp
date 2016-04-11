@@ -20,7 +20,7 @@ setup(
     name='python-memcached-udp',
     version='0.1a',
     description='A simple UDP Memcached client written in Python.',
-    long_description=open("README.md").read(),
+    long_description=open("README.rst").read(),
     url='https://github.com/idanmo/python-memcached-udp',
     author='Idan Moyal',
     author_email='idanmo@gmail.com',
@@ -28,8 +28,9 @@ setup(
     install_requires=[
         "six==1.10.0",
     ],
+    keywords='memcached udp',
     classifiers=[
-        'Development Status :: 1 - Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'License :: OSI Approved :: Apache Software License',
