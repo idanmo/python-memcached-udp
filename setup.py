@@ -18,7 +18,7 @@ from setuptools import setup
 
 setup(
     name='python-memcached-udp',
-    version='0.1a',
+    version='0.2a',
     description='A simple UDP Memcached client written in Python.',
     long_description=open("README.rst").read(),
     url='https://github.com/idanmo/python-memcached-udp',
