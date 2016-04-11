@@ -30,7 +30,7 @@ Installation
 
 .. code-block:: python
 
-    pip install https://github.com/idanmo/python-memcached-udp/archive/master.zip
+    pip install python-memcached-udp
 
 
 Usage
