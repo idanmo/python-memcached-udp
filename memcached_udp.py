@@ -21,6 +21,37 @@ import time
 from six import advance_iterator
 
 
+class _MemcachedUDPHeader(object):
+
+    def __init__(self, request_id, packet_number, total_packets, misc):
+        self.request_id = request_id
+        self.packet_number = packet_number
+        self.total_packets = total_packets
+        self.misc = misc
+
+
+class _MemcachedUDPResult(object):
+
+    def __init__(self):
+        self._total_packets = None
+        self._packets_data = None
+        self._packets_received = 0
+
+    def append(self, udp_header, packet_data):
+        self._total_packets = udp_header.total_packets
+        if self._packets_data is None:
+            self._packets_data = [None] * self._total_packets
+        self._packets_data[udp_header.packet_number] = packet_data
+        self._packets_received += 1
+
+    @property
+    def ready(self):
+        return self._packets_received == self._total_packets
+
+    def get(self):
+        return b''.join(self._packets_data)
+
+
 class Client(object):
 
     class MemcachedServerNotRespondingError(Exception):
@@ -43,7 +74,7 @@ class Client(object):
         while True:
             try:
                 data, server = self.socket.recvfrom(4096)
-                udp_header = struct.unpack('!Hhhh', data[:8])
+                udp_header = _MemcachedUDPHeader(*struct.unpack('!Hhhh', data[:8]))
                 if self._debug:
                     print(
                         'memcached_udp: results_handler [server]: {0}'.format(
@@ -51,14 +82,15 @@ class Client(object):
                     print('memcached_udp: results_handler [data]: {0}'.format(
                         data))
                     print('memcached_udp: id={0}, packet_number={1}, '
-                          'total_packets={2}, misc={3}'.format(*udp_header))
+                          'total_packets={2}, misc={3}'.format(
+                                udp_header.request_id, udp_header.packet_number,
+                                udp_header.total_packets, udp_header.misc))
 
-                request_id = udp_header[0]
-                if request_id in self._results:
-                    self._results[request_id] = data[8:]
+                if udp_header.request_id in self._results:
+                    self._results[udp_header.request_id].append(udp_header, data[8:])
                 elif self._debug:
                     print('memcached_udp: request id not found in results - '
-                          'ignoring... [request_id={0}]'.format(request_id))
+                          'ignoring... [request_id={0}]'.format(udp_header.request_id))
 
             except socket.timeout:
                 pass
@@ -78,19 +110,19 @@ class Client(object):
                 'request_id={1}]'.format(server, request_id))
         if request_id > 60000:
             self._request_id_generator = itertools.count()
-        self._results[request_id] = None
+        self._results[request_id] = _MemcachedUDPResult()
         return request_id
 
     def _wait_for_result(self, server, request_id):
         deadline = time.time() + self._response_timeout
         try:
-            while not self._results[request_id]:
+            while not self._results[request_id].ready:
                 if time.time() >= deadline:
                     raise self.MemcachedServerNotRespondingError(
                         'Memcached server is not responding: {0}'.format(
                             server))
                 time.sleep(0.1)
-            return self._results[request_id]
+            return self._results[request_id].get()
         finally:
             del self._results[request_id]
 

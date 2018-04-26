@@ -81,6 +81,13 @@ class MemcachedUDPTest(unittest.TestCase):
         if err:
             self.fail(err)
 
+    def test_multi_packet_response(self):
+        payload = 'B' * 65400 + 'A'
+        client = memcached_udp.Client([('localhost', 11211)])
+        client.set('multi-packet-response', payload)
+        r = client.get('multi-packet-response')
+        self.assertEquals(payload, r)
+
 
 class MemcachedUDPClusterTest(MemcachedUDPTest):
 

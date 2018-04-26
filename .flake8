@@ -1,0 +1,25 @@
+[flake8]
+max-line-length=120
+exclude=*/env/
+
+[pep8]
+max-line-length=120
+
+[autopep8]
+max-line-length=120
+
+[pylama]
+format = pylint
+skip = */.tox/*,*/.env/*
+max_line_length=120
+linters=radon,mccabe,pyflakes
+
+[pylama:pyflakes]
+builtins = _
+
+[pylama:pycodestyle]
+max_line_length=120
+
+[pylama:pylint]
+max_line_length=120
+disable=R
